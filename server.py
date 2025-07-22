@@ -1,24 +1,16 @@
 from fastapi import FastAPI, APIRouter, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-import uuid
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
-import json
 from dune_client.client import DuneClient
 from eth_utils import is_address
 
 # Load environment variables
 load_dotenv()
-
-# MongoDB connection
-mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ.get('DB_NAME', 'era_airdrop')]
 
 # Dune client
 dune_api_key = os.environ.get('DUNE_API_KEY')
@@ -26,6 +18,9 @@ dune = DuneClient(dune_api_key) if dune_api_key else None
 
 app = FastAPI(title="Era Airdrop Dashboard API", version="1.0.0")
 api_router = APIRouter(prefix="/api")
+
+# In-memory stats counter
+query_count = 0
 
 # Models
 class AirdropData(BaseModel):
@@ -127,30 +122,40 @@ async def root():
 
 @api_router.get("/airdrop/{wallet_address}", response_model=AirdropResponse)
 async def get_airdrop_data(wallet_address: str):
+    global query_count
+    
     if not is_address(wallet_address):
         return AirdropResponse(success=False, data=None, message="Invalid Ethereum wallet address format")
     
     try:
         data_dict = await query_era_airdrop_data(wallet_address.lower())
+        query_count += 1  # Simple counter
         return AirdropResponse(success=True, data=AirdropData(**data_dict), message="Data retrieved successfully")
     except Exception as e:
         return AirdropResponse(success=False, data=None, message=f"Failed to retrieve airdrop data: {str(e)}")
 
 @api_router.get("/stats")
 async def get_dashboard_stats():
-    try:
-        total_queries = await db.airdrop_queries.count_documents({})
-        return {"total_queries": total_queries, "recent_queries": 0, "status": "operational"}
-    except Exception:
-        return {"total_queries": 0, "recent_queries": 0, "status": "operational"}
+    """Get simple dashboard statistics"""
+    return {
+        "total_queries": query_count,
+        "recent_queries": 0,
+        "status": "operational"
+    }
 
+# Include router and middleware
 app.include_router(api_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# Logging
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("🚀 Era Airdrop Dashboard API started successfully!")
 
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
-
