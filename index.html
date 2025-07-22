@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Era Airdrop Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #991b1b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        .search-box {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(239,68,68,0.3);
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .input-group {
+            display: flex;
+            gap: 1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        input {
+            flex: 1;
+            padding: 1rem;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(239,68,68,0.3);
+            border-radius: 0.75rem;
+            color: white;
+            font-size: 1rem;
+        }
+        input::placeholder {
+            color: rgba(252,165,165,0.7);
+        }
+        button {
+            padding: 1rem 2rem;
+            background: linear-gradient(to right, #ef4444, #ec4899);
+            border: none;
+            border-radius: 0.75rem;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(239,68,68,0.2);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            backdrop-filter: blur(10px);
+        }
+        .error {
+            background: rgba(239,68,68,0.2);
+            border: 1px solid rgba(239,68,68,0.3);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            text-align: center;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+        }
+        .spinner {
+            display: inline-block;
+            width: 2rem;
+            height: 2rem;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+        
+        function App() {
+            const [walletAddress, setWalletAddress] = useState("");
+            const [airdropData, setAirdropData] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState("");
+
+            const validateWalletAddress = (address) => {
+                const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+                return ethAddressRegex.test(address);
+            };
+
+            const handleSearch = async () => {
+                if (!walletAddress.trim()) {
+                    setError("Please enter a wallet address");
+                    return;
+                }
+
+                if (!validateWalletAddress(walletAddress.trim())) {
+                    setError("Please enter a valid Ethereum wallet address (0x...)");
+                    return;
+                }
+
+                setLoading(true);
+                setError("");
+                setAirdropData(null);
+
+                try {
+                    const response = await axios.get(`/api/airdrop/${walletAddress.trim()}`);
+                    
+                    if (response.data.success) {
+                        setAirdropData(response.data.data);
+                    } else {
+                        setError(response.data.message || "Failed to fetch airdrop data");
+                    }
+                } catch (e) {
+                    setError("Failed to connect to the server. Please try again.");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const formatAmount = (amount) => {
+                if (amount === 0 || !amount) return "0";
+                return parseFloat(amount).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 4,
+                });
+            };
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <h1 style={{fontSize: '3rem', marginBottom: '0.5rem'}}>🚀 Era Airdrop Dashboard</h1>
+                        <p style={{color: 'rgba(252,165,165,0.8)', fontSize: '1.2rem'}}>Check your Caldera Foundation airdrop status</p>
+                    </div>
+
+                    <div className="search-box">
+                        <h2 style={{textAlign: 'center', marginBottom: '1.5rem'}}>Enter Your Wallet Address</h2>
+                        
+                        <div className="input-group">
+                            <input
+                                type="text"
+                                value={walletAddress}
+                                onChange={(e) => setWalletAddress(e.target.value)}
+                                placeholder="0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+                                onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+                            />
+                            <button onClick={handleSearch} disabled={loading}>
+                                {loading ? (
+                                    <>
+                                        <span className="spinner"></span>
+                                        Checking...
+                                    </>
+                                ) : (
+                                    "Check Airdrop"
+                                )}
+                            </button>
+                        </div>
+                        
+                        {error && <div className="error">{error}</div>}
+                    </div>
+
+                    {loading && (
+                        <div className="loading">
+                            <div className="spinner"></div>
+                            <p>Querying blockchain data...</p>
+                        </div>
+                    )}
+
+                    {airdropData && (
+                        <div className="results">
+                            <div className="card">
+                                <h3>💎 Total Allocation</h3>
+                                <p style={{fontSize: '2rem', fontWeight: 'bold'}}>{formatAmount(airdropData.total_allocation)} ERA</p>
+                            </div>
+                            
+                            <div className="card">
+                                <h3>✅ Claimed Amount</h3>
+                                <p style={{fontSize: '2rem', fontWeight: 'bold'}}>{formatAmount(airdropData.claimed_amount)} ERA</p>
+                            </div>
+                            
+                            <div className="card">
+                                <h3>🔗 Vested Tokens</h3>
+                                <p><a href="https://claim.caldera.foundation/" target="_blank" rel="noopener noreferrer" style={{color: '#ec4899', textDecoration: 'underline'}}>Check Here →</a></p>
+                                <p style={{fontSize: '0.9rem', opacity: '0.8'}}>Official Caldera Site</p>
+                            </div>
+                            
+                            <div className="card">
+                                <h3>⏰ Days Left Vesting</h3>
+                                <p style={{fontSize: '2rem', fontWeight: 'bold'}}>{airdropData.days_left_vesting || 0} Days</p>
+                            </div>
+                            
+                            <div className="card">
+                                <h3>📊 Claim Status</h3>
+                                <p style={{fontSize: '1.2rem', fontWeight: 'bold', color: airdropData.is_claimed ? '#10b981' : '#ef4444'}}>
+                                    {airdropData.is_claimed ? '✅ Claimed' : '❌ Unclaimed'}
+                                </p>
+                                <p style={{fontSize: '0.9rem', opacity: '0.8'}}>
+                                    Pre-claim: {airdropData.pre_claim_status ? '✅ Yes' : '❌ No'}
+                                </p>
+                            </div>
+                            
+                            {airdropData.total_allocation === 0 && (
+                                <div className="card" style={{gridColumn: '1 / -1', textAlign: 'center'}}>
+                                    <h2>😔 No Airdrop Allocation</h2>
+                                    <p>This wallet address was not eligible for the Era airdrop.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
