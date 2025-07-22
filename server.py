@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
@@ -142,7 +143,13 @@ async def get_dashboard_stats():
         "recent_queries": 0,
         "status": "operational"
     }
+# Serve the frontend HTML file
+@app.get("/")
+async def serve_frontend():
+    return FileResponse('index.html')
 
+# Include router and middleware
+app.include_router(api_router)
 # Include router and middleware
 app.include_router(api_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
